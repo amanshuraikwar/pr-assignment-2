@@ -7,7 +7,7 @@ import random
 
 THRESHOLD=0.001
 MAXITERATIONS=50
-EMTHRESHOLD=0.001
+EMTHRESHOLD=1
 
 def belongsToClusture(dataPoint,means):
 	distances=[]
@@ -38,7 +38,7 @@ def kMeansClusture(k,data,minx,maxx,miny,maxy,datainclusters):
 	#datainclusters=[]
 
 	for i in range(k):
-		randindex=random.randrange(len(data))
+		randindex=random.randrange(int(len(data)*TRAININGDATALIMIT))
 		curmeans.append([[data[randindex][0][0]],[data[randindex][1][0]]])
 		datainclusters.append([])
 
@@ -47,7 +47,7 @@ def kMeansClusture(k,data,minx,maxx,miny,maxy,datainclusters):
 	while(True):
 		interationNo+=1
 
-		for i in range(len(data)):
+		for i in range(int(len(data)*TRAININGDATALIMIT)):
 			datainclusters[belongsToClusture(data[i],curmeans)].append(data[i])
 
 		newmeans=[]
@@ -77,6 +77,11 @@ def calculateL(data,mean,covariance,piik):
 			tempL[clsi]+=tempSum
 	return tempL
 
+def NormalDist(data,mean,covariance):
+	temp=funcs.subM(data,mean)
+	temp=funcs.mulM(funcs.mulM(funcs.transpose(temp),funcs.inverse(covariance)),temp)
+	N=funcs.det(funcs.inverse(covariance))*math.exp(-0.5*temp[0][0])/math.sqrt(2*3.14)
+	return N
 
 #universal matrices
 data=[]
@@ -87,6 +92,8 @@ pik=[]
 
 oldL=[]
 newL=[]
+
+TRAININGDATALIMIT=0.75
 
 minx=0
 miny=0
@@ -138,6 +145,7 @@ clsno=len(data)
 
 #initial no of clusters
 curnoofclusters=5
+
 for i in range(clsno):
 	mean[i]=kMeansClusture(curnoofclusters,data[i],minx,maxx,miny,maxy,datainclusters[i])
 
@@ -164,7 +172,7 @@ while(True):
 
 	for clsi in range(clsno):
 		gammak.append([])
-		for datai in range(len(data[clsi])):
+		for datai in range(int(len(data[clsi])*TRAININGDATALIMIT)):
 			gammak[clsi].append([])
 			totalgamma=0;
 			for clusi in range(curnoofclusters):
@@ -174,7 +182,7 @@ while(True):
 				gammak[clsi][datai][clusi]=[funcs.det(funcs.inverse(covariance[clsi][clusi]))*math.exp(-0.5*temp[0][0])/math.sqrt(2*3.14)]
 				gammak[clsi][datai][clusi][0]*=pik[clsi][clusi]
 				totalgamma+=gammak[clsi][datai][clusi][0]
-			if(len(gammak[clsi][datai])!=5):
+			if(len(gammak[clsi][datai])!=curnoofclusters):
 				print "error"
 			gammak[clsi][datai]=funcs.divByConstM(gammak[clsi][datai],totalgamma)
 
@@ -186,18 +194,18 @@ while(True):
 		for clusi in range(curnoofclusters):
 			NK[clsi].append([])
 			NK[clsi][clusi]=0
-			for datai in range(len(data[clsi])):
+			for datai in range(int(len(data[clsi])*TRAININGDATALIMIT)):
 				NK[clsi][clusi]+=gammak[clsi][datai][clusi][0]
 
 	for clsi in range(clsno):
 		for clusi in range(curnoofclusters):
 			pik[clsi][clusi]=NK[clsi][clusi]/len(data[clsi])
 			mean[clsi][clusi]=[[0],[0]]
-			for datai in range(len(data[clsi])):
+			for datai in range(int(len(data[clsi])*TRAININGDATALIMIT)):
 				mean[clsi][clusi]=funcs.addM(mean[clsi][clusi],funcs.mulByConstM(data[clsi][datai],gammak[clsi][datai][clusi][0]))
 			mean[clsi][clusi]=funcs.divByConstM(mean[clsi][clusi],NK[clsi][clusi])
 			covariance[clsi][clusi]=[[0,0],[0,0]]
-			for datai in range(len(data[clsi])):
+			for datai in range(int(len(data[clsi])*TRAININGDATALIMIT)):
 				covariance[clsi][clusi]=funcs.addM(funcs.mulByConstM(funcs.mulM(funcs.subM(data[clsi][datai],mean[clsi][clusi]),funcs.transpose(funcs.subM(data[clsi][datai],mean[clsi][clusi]))),gammak[clsi][datai][clusi][0]),covariance[clsi][clusi])
 			covariance[clsi][clusi]=funcs.divByConstM(covariance[clsi][clusi],NK[clsi][clusi])
 
@@ -210,9 +218,44 @@ while(True):
 
 	datainclusters=[]
 
+'''
 	for clsi in range(clsno):
 		datainclusters.append([])
 		for clusi in range(curnoofclusters):
 			datainclusters[clsi].append([])
 		for datai in range(len(data[clsi])):
 			datainclusters[clsi][funcs.classify(data[clsi][datai],mean[clsi],covariance[clsi],pik[clsi])].append(data[clsi][datai])
+'''
+
+fig=plt.figure()
+color=["#F49292","#A9F5AF","#A1A4FF","#F3F3AF"]
+color1=["#E21818","#17E81F","#252BDF","#D2C81D"]
+xinc=(maxx-minx)/50
+yinc=(maxy-miny)/50
+
+#abcd
+gx=[]
+for clsi in range(clsno):
+	gx.append(0)
+
+y=miny
+while(y<maxy):
+	x=minx
+	while(x<maxx):
+		for clsi in range(clsno):
+			temp=0.0
+			for clusi in range(len(mean[clsi])):
+				temp+=pik[clsi][clusi]*NormalDist([[x],[y]],mean[clsi][clusi],covariance[clsi][clusi])
+			temp=math.log(temp)
+			gx[clsi]=temp
+		clas=gx.index(max(gx))
+		plt.plot(x,y,color=color[clas],marker="o",markeredgecolor=color[clas])
+		x+=xinc
+	y+=yinc
+
+for clsi in range(clsno):
+	for datai in range(int(TRAININGDATALIMIT*len(data[clsi]))):
+		plt.plot(data[clsi][datai][0][0],data[clsi][datai][1][0],color=color1[clsi],marker="o")
+
+plt.axis([minx,maxx,miny,maxy])
+plt.show()
