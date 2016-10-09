@@ -1,0 +1,16 @@
+[[125, 0], [0, 125]]
+accuracy :  1.0
+precision :  [1.0, 1.0]
+mean precision :  1.0
+recall :  [1.0, 1.0]
+mean recall :  1.0
+f measure :  [1.0, 1.0]
+mean fmeasure 1.0
+
+
+THRESHOLD=0.001
+MAXITERATIONS=50
+EMMAXITERATIONS=50
+EMTHRESHOLD=0.1
+TRAININGDATALIMIT=0.75
+CURRENTNOOFCLUSTERS=30

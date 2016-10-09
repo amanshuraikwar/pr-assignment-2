@@ -2,6 +2,9 @@ import funcs
 
 import sys
 import math
+from mpl_toolkits.mplot3d import Axes3D
+from matplotlib import cm
+from matplotlib.ticker import LinearLocator, FormatStrFormatter
 import matplotlib.pyplot as plt
 import random
 
@@ -10,7 +13,7 @@ MAXITERATIONS=50
 EMMAXITERATIONS=50
 EMTHRESHOLD=0.1
 TRAININGDATALIMIT=0.75
-CURRENTNOOFCLUSTERS=10
+CURRENTNOOFCLUSTERS=2
 
 def belongsToClusture(dataPoint,means):
 	distances=[]
@@ -113,8 +116,133 @@ def calculateL(data,mean,covariance,piik):
 def NormalDist(data,mean,covariance):
 	temp=funcs.subM(data,mean)
 	temp=funcs.mulM(funcs.mulM(funcs.transpose(temp),funcs.inverse(covariance)),temp)
-	N=math.exp(-0.5*temp[0][0])/math.sqrt(2*3.14)*math.sqrt(funcs.det(covariance))
+	N=math.exp(-0.5*temp[0][0])/(math.sqrt(2*3.14)*math.sqrt(funcs.det(covariance)))
 	return N
+
+def confusionM(data,mean,covariance,pik):
+	clsno=len(data)
+	returnM=[]
+	p=[]
+
+	gx=[]
+	for clsi in range(clsno):
+		gx.append(0)
+		p.append(0)
+
+	for clsi in range(clsno):
+		dtno=len(data[clsi])
+		
+		for cli in range(clsno):
+			p[cli]=0
+
+		for datai in range (int(math.floor(0.75*dtno)),dtno):
+			for cli in range(clsno):
+				temp=0.0
+				for clusi in range(len(mean[cli])):
+					temp+=pik[cli][clusi]*NormalDist(data[clsi][datai],mean[cli][clusi],covariance[cli][clusi])
+				totalN=0
+				for xx in range(clsno):
+					totalN+=len(data[xx])
+
+				temp*=float(len(data[cli]))/float(totalN)
+
+				#hopefully this does not execute
+				if(temp>1):
+					temp=0.999999
+					# print pik[cli]
+					# print "error probability :",temp
+					# print "probability more that 1 error"
+					# print "TERMINATING"
+					# exit()
+
+				temp=math.log(temp)
+				gx[cli]=temp
+		
+			mgx=gx.index(max(gx))
+			p[mgx]+=1
+
+		returnM.append(p[:])
+	return returnM	
+
+def accuracy(confmatrix,ntest):
+	dmatrix=len(confmatrix)
+	accu=0.0
+	for i in range (dmatrix):
+		accu=accu+confmatrix[i][i]
+	accu=accu/ntest
+	return accu
+
+def per_accuracy(confmatrix,ntest):
+	p_accu=accuracy(confmatrix,ntest)
+	return p_accu*100
+
+def precision(confmatrix):
+	pre=[]
+	dmatrix=len(confmatrix)
+	for i in range (dmatrix):
+		tp=0.0		
+		for j in range (dmatrix):
+			tp=tp+confmatrix[j][i]
+		tc=confmatrix[i][i]
+		if (tp==0):
+			pre.append(-1)
+		else:	
+			pre.append(tc/tp)
+	return pre
+
+def mean_precision(confmatrix):
+	pre=precision(confmatrix)
+	temp=0.0
+	lenn=len(pre)
+	for i in range(lenn):
+		if(pre[i]==-1):
+			lenn-=1
+		else:	
+			temp=temp+pre[i]
+	return (temp/lenn)
+
+def recall(confmatrix):
+	rec=[]
+	dmatrix=len(confmatrix)
+	for i in range(dmatrix):
+		n=0.0
+		for j in range(dmatrix):
+			n=n+confmatrix[i][j]
+		tc=confmatrix[i][i]
+		rec.append(tc/n)
+	return rec
+
+def mean_recall(confmatrix):
+	rec=recall(confmatrix)
+	temp=0.0
+	for i in range (len(rec)):
+		temp=temp+rec[i]
+	return (temp/(len(rec)))
+
+def f_measure(confmatrix):
+	f=[]
+	pre=precision(confmatrix)
+	rec=recall(confmatrix)
+	temp=0.0
+	for i in range (len(confmatrix)):
+		if (pre[i]==-1):
+			f.append(-1)
+		else:
+			temp=pre[i]*rec[i]*2/(pre[i]+rec[i])
+			f.append(temp)
+
+	return f
+
+def mean_f_measure(confmatrix):
+	f=f_measure(confmatrix)
+	temp=0.0
+	lenn=len(f)
+	for i in range (lenn):
+		if(f[i]==-1):
+			lenn-=1
+		else:
+			temp=temp+f[i]
+	return (temp/(lenn))
 
 #universal matrices
 data=[]
@@ -132,9 +260,10 @@ maxx=0
 maxy=0
 #reading files and storing data in data[]
 DATAVALUESEPARATOR=" "
-nooffiles=len(sys.argv)-1
+nooffiles=len(sys.argv)-2
 
-PRINTSTEPSFLAG=int(sys.argv[len(sys.argv)-1])
+PRINTSTEPSFLAG=int(sys.argv[len(sys.argv)-2])
+CURRENTNOOFCLUSTERS=int(sys.argv[len(sys.argv)-1])
 
 #for each file
 for filei in range(1,nooffiles):
@@ -176,9 +305,11 @@ for filei in range(1,nooffiles):
 
 #no of classes
 clsno=len(data)
+totaltestdatano=0
 
 for i in range(clsno):
 	mean[i]=kMeansClusture(CURRENTNOOFCLUSTERS,data[i],minx,maxx,miny,maxy,datainclusters[i])
+	totaltestdatano+=0.25*len(data[i])
 
 #print mean
 
@@ -198,7 +329,7 @@ print "L CALCULATED"
 
 interationNo=0
 
-clusterColors=[["#d32f2f","#c2185b","#7b1fa2","#512da8","#e57373"],["#00796b","#388e3c","#689f38","#afb42b","#81c784"],["#303f9f","#1976d2","#0288d1","#0097a7","#64b5f6"]]
+clusterColors=[["#ffcdd2","#e57373","#f44336","#b71c1c","#f06292","#e91e63","#c2185b","#880e4f"],["#b2dfdb","#4db6ac","#009688","#00796b","#004d40","#a5d6a7","#66bb6a","#1b5e20"],["#303f9f","#1976d2","#0288d1","#0097a7","#64b5f6"]]
 
 while(True):
 	interationNo+=1
@@ -277,6 +408,31 @@ while(True):
 		plt.axis([minx,maxx,miny,maxy])
 		fig.savefig(str(interationNo)+".png")
 
+confM=confusionM(data,mean,covariance,pik)
+acc=accuracy(confM,totaltestdatano)
+prec=precision(confM)
+meprec=mean_precision(confM)
+rec=recall(confM)
+merec=mean_recall(confM)
+fmes=f_measure(confM)
+mefmes=mean_f_measure(confM)
+
+print confM
+print "accuracy : ",str(acc)
+print "precision : ",str(prec)
+print "mean precision : ",str(meprec)
+print "recall : ",str(rec)
+print "mean recall : ",str(merec)
+print "f measure : ",str(fmes)
+print "mean fmeasure",str(mefmes)
+
+print "THRESHOLD :",THRESHOLD
+print "MAXITERATIONS :",MAXITERATIONS
+print "EMMAXITERATIONS :",EMMAXITERATIONS
+print "EMTHRESHOLD :",EMTHRESHOLD
+print "TRAININGDATALIMIT :",TRAININGDATALIMIT
+print "CURRENTNOOFCLUSTERS :",CURRENTNOOFCLUSTERS
+
 fig=plt.figure()
 subplot=fig.add_subplot(111)
 
@@ -324,10 +480,12 @@ while(y<maxy):
 
 			#hopefully this does not execute
 			if(temp>1):
-				print "error probability :",temp
-				print "probability more that 1 error"
-				print "TERMINATING"
-				exit()
+				temp=0.999999
+				# pik[clsi]
+				# print "error probability :",temp
+				# print "probability more that 1 error"
+				# print "TERMINATING"
+				# exit()
 
 			temp=math.log(temp)
 			gx[clsi]=temp
@@ -360,7 +518,7 @@ plt.axis([minx,maxx,miny,maxy])
 contourFig=plt.figure()
 contourSubPlot=contourFig.add_subplot(111)
 #CS = contourSubPlot.contour(vecx,vecy,vecz,zorder=2,level=funcs.generateGP(mingx,maxgx))
-CS = contourSubPlot.contour(vecx,vecy,vecz,zorder=2)
+CS = contourSubPlot.contour(vecx,vecy,vecz,zorder=2,level=funcs.generateGP(mingx,maxgx))
 contourSubPlot.clabel(CS, inline=1, fontsize=10)	
 
 for clsi in range(clsno):
@@ -371,6 +529,23 @@ for clsi in range(clsno):
 plt.axis([minx,maxx,miny,maxy])
 
 print "SAVING CONTOUR GRAPH"
-contourFig.savefig("contour.png")
+contourFig.savefig("contour-K-"+str(CURRENTNOOFCLUSTERS)+".png")
 print "SAVING BOUNDARIES GRAPH"
-fig.savefig("boundaries.png")
+fig.savefig("boundaries-K-"+str(CURRENTNOOFCLUSTERS)+".png")
+
+fig = plt.figure()
+ax = fig.gca(projection='3d')
+surf = ax.plot_surface(vecx,vecy,vecz, rstride=1, cstride=1, cmap=cm.coolwarm,linewidth=0, antialiased=False)
+ax.set_zlim(-1.5,maxgx)
+
+fig.colorbar(surf, shrink=0.5, aspect=5)
+
+fig.savefig("3d-1.png")
+
+fig = plt.figure()
+ax = fig.add_subplot(111, projection='3d')
+
+ax.plot_surface(vecx, vecy, vecz, rstride=4, cstride=4, color='b')
+ax.set_zlim(-1.5,maxgx)
+
+fig.savefig("3d-2.png")

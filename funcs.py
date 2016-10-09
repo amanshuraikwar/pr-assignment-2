@@ -274,21 +274,51 @@ def plotBoundries(subplot,me,cov,subplot1):
 	CS = subplot1.contour(vecx,vecy,vecz,zorder=2,level=generateGP(mingx,maxgx))
 	subplot1.clabel(CS, inline=1, fontsize=10)	
 
-def confusionM(data,me,co):
+
+
+
+def confusionM(data,mean,covariance,pik):
 	clsno=len(data)
 	returnM=[]
 	p=[]
+
+	gx=[]
 	for clsi in range(clsno):
+		gx.append(0)
 		p.append(0)
 
 	for clsi in range(clsno):
+		
 		dtno=len(data[clsi])
+		
 		for cli in range(clsno):
 			p[cli]=0
+
 		for datai in range (int(math.floor(0.75*dtno)),dtno):
-			k=classify(data[clsi][datai],me,co)
-			p[k]+=1
-		#bakchodi
+			for cli in range(clsno):
+				temp=0.0
+				for clusi in range(len(mean[cli])):
+					temp+=pik[cli][clusi]*NormalDist([[x],[y]],mean[cli][clusi],covariance[cli][clusi])
+
+				totalN=0
+				for xx in range(clsno):
+					totalN+=len(data[xx])
+
+				temp*=float(len(data[clsi]))/float(totalN)
+
+				#hopefully this does not execute
+				if(temp>1):
+					print "error probability :",temp
+					print "probability more that 1 error"
+					print "TERMINATING"
+					exit()
+
+				temp=math.log(temp)
+				gx[clsi]=temp
+		
+			mgx=gx.index(max(gx))
+			p[mgx]+=1
+
 		returnM.append(p[:])
 	return returnM	
 
